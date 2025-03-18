@@ -1,23 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { Modal } from "bootstrap";
-
-
+import { useDispatch } from "react-redux";
+import { pushMessage } from "../redux/toastSlice";
+import PropTypes from "prop-types";
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
 const API_PATH = import.meta.env.VITE_API_PATH;
 
 
-
-function productModal({
-    modalMode,
-    tempProduct,
-    isOpen,
-    setIsOpen,
-    getProducts
-}) {
-
-  const defaultModalState = {
+function ProductModal({ modalMode, tempProduct, isOpen, setIsOpen, getProducts }) {
+  const [modalData, setModalData] = useState({
     imageUrl: "",
     title: "",
     category: "",
@@ -28,128 +21,150 @@ function productModal({
     content: "",
     is_enabled: 0,
     imagesUrl: [""],
-};
+  });
 
-const [modalData, setModalData] = useState(tempProduct || defaultModalState);
+  const dispatch = useDispatch();
+  const productModalRef = useRef(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-    useEffect(() => {
+  useEffect(() => {
+    if (tempProduct) {
+      setModalData({ ...tempProduct });
+    } else {
       setModalData({
-        ...tempProduct
-      })
-    }, [tempProduct])
+        imageUrl: "",
+        title: "",
+        category: "",
+        unit: "",
+        origin_price: "",
+        price: "",
+        description: "",
+        content: "",
+        is_enabled: 0,
+        imagesUrl: [""],
+      });
+    }
+  }, [tempProduct]);
 
-    const productModalRef = useRef(null);
+  useEffect(() => {
+    const modalElement = productModalRef.current;
+    const modalInstance = Modal.getOrCreateInstance(modalElement);
 
-    useEffect(() => {
-      const modalElement = productModalRef.current;
-      const modalInstance = Modal.getOrCreateInstance(modalElement);
-  
-      if (isOpen) {
-          modalInstance.show();
-      } else {
-          modalInstance.hide();
+    if (isOpen) {
+      modalInstance.show();
+    } else {
+      modalInstance.hide();
+    }
+
+    return () => {
+      if (modalInstance) {
+        modalInstance.dispose();
       }
-  
-      return () => modalInstance.dispose();
+    };
   }, [isOpen]);
 
+  const handleCloseProductModal = () => {
+    const modalInstance = Modal.getInstance(productModalRef.current);
+    if (modalInstance) {
+      modalInstance.hide();
+    }
+    setIsOpen(false);
+    document.activeElement.blur(); 
+  };
 
-      const handleCloseProductModal = () => {
-        const modalInstance = Modal.getInstance(productModalRef.current);
-        modalInstance.hide();
-
-        setIsOpen(false);
-      };
-
-
-      const handleModalInputChange = (e) => {
-        const { value, name, checked, type } = e.target;
-        setModalData({ ...modalData, [name]: type === "checkbox" ? checked : value });
-      };
+  const handleModalInputChange = (e) => {
+    const { value, name, checked, type } = e.target;
+    setModalData({ ...modalData, [name]: type === "checkbox" ? checked : value });
+  };
     
-      const handleImageChange = (e, index) => {
-        const { value } = e.target;
-        const newImages = [...(modalData.imagesUrl || [])];
-        newImages[index] = value;
+  const handleImageChange = (e, index) => {
+    const { value } = e.target;
+    const newImages = [...(modalData.imagesUrl || [])];
+    newImages[index] = value;
+    setModalData({ ...modalData, imagesUrl: newImages });
+  };
+
+const handleAddImage = () => {
+        const newImages = [...(modalData.imagesUrl || []), ""];
         setModalData({ ...modalData, imagesUrl: newImages });
-      };
+  };
+        
+
+  const handleRemoveImage = () => {
+    const newImages = [...(modalData.imagesUrl || [])];
+    newImages.pop();
     
-    const handleAddImage = () => {
-            const newImages = [...(modalData.imagesUrl || []), ""];
-            setModalData({ ...modalData, imagesUrl: newImages });
-      };
-        
-        
-          const handleRemoveImage = () => {
-            const newImages = [...(modalData.imagesUrl || [])];
-            newImages.pop();
-            
-            setModalData({ ...modalData, imagesUrl: newImages });
-          };
+    setModalData({ ...modalData, imagesUrl: newImages });
+  };
 
 
-          const createProduct = async () => {
-            try {
-              await axios.post(`${BASE_URL}/v2/api/${API_PATH}/admin/product`, {
-                data: {
-                  ...modalData,
-                  origin_price: Number(modalData.origin_price),
-                  price: Number(modalData.price),
-                  is_enabled: modalData.is_enabled ? 1 : 0
-                }
-              });
-            } catch (error) {
-              alert("新增產品失敗");
-            }
-          };
-        
-          const updateProduct = async () => {
-            try {
-              await axios.put(`${BASE_URL}/v2/api/${API_PATH}/admin/product/${modalData.id}`, {
-                data: {
-                  ...modalData,
-                  origin_price: Number(modalData.origin_price),
-                  price: Number(modalData.price),
-                  is_enabled: modalData.is_enabled ? 1 : 0
-                }
-              });
-            } catch (error) {
-              alert("編輯產品失敗");
-            }
-          };
+ const createProduct = async () => {
+    const cleanedData = {
+      ...modalData,
+      origin_price: Number(modalData.origin_price) || 0,
+      price: Number(modalData.price) || 0,
+      is_enabled: modalData.is_enabled ? 1 : 0,
+      imagesUrl: modalData.imagesUrl.filter((url) => url !== "")
+    };
+    await axios.post(`${BASE_URL}/v2/api/${API_PATH}/admin/product`, { data: cleanedData });
+  };
 
-          const handleUpdateProduct = async () => {
-            const apiCall = modalMode === "create" ? createProduct : updateProduct;
-            try {
-                await apiCall();
-                getProducts();
-                handleCloseProductModal();
-                setTempProduct(defaultModalState);  
-            } catch (error) {
-                alert("更新產品失敗");
-            }
-        };
+  const updateProduct = async () => {
+    const cleanedData = {
+      ...modalData,
+      origin_price: Number(modalData.origin_price) || 0,
+      price: Number(modalData.price) || 0,
+      is_enabled: modalData.is_enabled ? 1 : 0,
+      imagesUrl: Array.isArray(modalData.imagesUrl) ? modalData.imagesUrl.filter((url) => url !== "") : []
+    };
+    await axios.put(`${BASE_URL}/v2/api/${API_PATH}/admin/product/${modalData.id}`, { data: cleanedData });
+  };
+  
 
-          const handleFileChange = async (e) => {
-            const file = e.target.files[0];
-          
-            const formData = new FormData();
-            formData.append('file-to-upload', file);
-          
-            try {
-              const res = await axios.post(`${BASE_URL}/v2/api/${API_PATH}/admin/upload`, formData);
-              const uploadedImageUrl = res.data.imageUrl;
-          
-              setModalData({
-                ...modalData,
-                imageUrl: uploadedImageUrl
-              });
-            } catch (error) {
-              alert("上傳圖片失敗");
-            }
-          };
+  const handleUpdateProduct = async () => {
+    if (isSubmitting) return; 
+    setIsSubmitting(true);
+    const apiCall = modalMode === "create" ? createProduct : updateProduct;
+    try {
+      await apiCall();
+      dispatch(pushMessage({ 
+        text: modalMode === "create" ? "新增產品成功" : "編輯產品成功", 
+        status: "success" }));
+      getProducts();
+      handleCloseProductModal();
+      setModalData({
+        imageUrl: "",
+        title: "",
+        category: "",
+        unit: "",
+        origin_price: "",
+        price: "",
+        description: "",
+        content: "",
+        is_enabled: 0,
+        imagesUrl: [""],
+      });
+    } catch (err) {
+      console.error(err);
+      dispatch(pushMessage({ text: "更新產品失敗", status: "failed" }));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    const formData = new FormData();
+    formData.append('file-to-upload', file);
 
+    try {
+      const res = await axios.post(`${BASE_URL}/v2/api/${API_PATH}/admin/upload`, formData);
+      const uploadedImageUrl = res.data.imageUrl;
+      setModalData({ ...modalData, imageUrl: uploadedImageUrl });
+    } catch (error) {
+      dispatch(pushMessage({ text: "上傳圖片失敗", status: "failed" }));
+    }
+  };
 
 return (
     <div ref={productModalRef} id="productModal" className="modal" style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
@@ -375,4 +390,11 @@ return (
 )
 }
 
-export default productModal
+ProductModal.propTypes = {
+  modalMode: PropTypes.oneOf(["create", "edit"]).isRequired, 
+  tempProduct: PropTypes.object, 
+  isOpen: PropTypes.bool.isRequired, 
+  setIsOpen: PropTypes.func.isRequired, 
+  getProducts: PropTypes.func.isRequired, 
+};
+export default ProductModal;

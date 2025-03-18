@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import axios from "axios";
-import { Modal } from "bootstrap";
 import Pagination from "../components/Pagination";
 import ProductModal from "../components/ProductModal";
 import DelProductModal from "../components/DelProductModal";
+import Toast from "../components/Toast";
 
 
 const BASE_URL = import.meta.env.VITE_BASE_URL;
@@ -23,13 +23,13 @@ const defaultModalState = {
 };
 
 
-function ProductPage(){
+function ProductPage({ setIsAuth }){
 
     const [products, setProducts] = useState([]);
 
     const [tempProduct, setTempProduct] = useState(defaultModalState);
 
-    const [modalMode, setModalMode] = useState(null);
+    const [modalMode, setModalMode] = useState("create");
 
     const [isProductModalOpen, setIsProductModalOpen] = useState(false);
     const [isDelProductModalOpen, setIsDelProductModalOpen] = useState(false);
@@ -56,9 +56,6 @@ function ProductPage(){
     setIsDelProductModalOpen(true);
   };
 
- 
-
-
     const handleOpenProductModal = (mode, product) => {
         setModalMode(mode);
         switch (mode) {
@@ -78,9 +75,28 @@ function ProductPage(){
   const handlePageChange = (page) => {
     getProducts(page)
   }
+
+  const handleLogout = async () => {
+    try {
+       await axios.post(`${BASE_URL}/v2/logout`);
+       setIsAuth(false);
+    } catch (error) {
+        alert("登出失敗");
+    }
+};
+
+
     return (
         <>
+
             <div className="container py-5">
+            <div className="row mb-3">
+              <div className="justify-content-end">
+                <button onClick={handleLogout} type="button" className="btn btn-secondary">
+                  登出
+                </button>
+              </div>
+            </div>
         <div className="row">
             <div className="col">
             <div className="d-flex justify-content-between">
@@ -135,6 +151,8 @@ function ProductPage(){
         isOpen={isDelProductModalOpen} 
         setIsOpen={setIsDelProductModalOpen} 
         />
+
+        <Toast />
         </>
     )
     
